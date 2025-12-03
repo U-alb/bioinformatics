@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promoter ODS Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .file-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #3498db;
+            border-radius: 10px;
+            background-color: #f8f9fa;
+        }
+        .file-input {
+            margin: 10px 0;
+        }
+        input[type="file"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        input[type="number"] {
+            width: 100px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            min-width: 200px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button.download {
+            background-color: #27ae60;
+        }
+        button.download:hover {
+            background-color: #219a52;
+        }
+        .sequences-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 20px 0;
+        }
+        .sequence-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .sequence-item:hover {
+            background-color: #f0f8ff;
+        }
+        .sequence-item.active {
+            background-color: #3498db;
+            color: white;
+        }
+        .canvas-container {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            margin: 30px 0;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            background-color: white;
+            width: 100%;
+        }
+        .results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .result-box {
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        .result-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: none;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .ods-info {
+            background-color: #e8f4fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #3498db;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Promoter ODS Generator</h1>
+
+    <div class="file-section">
+        <h2>Upload FASTA File</h2>
+        <p>Upload a FASTA file containing promoter sequences to generate Objective Digital Stains (ODS)</p>
+
+        <div class="file-input">
+            <input type="file" id="fastaFile" accept=".fasta,.fa,.txt">
+        </div>
+
+        <div class="controls">
+            <div>
+                <label for="windowSize">Window Size (bp):</label>
+                <input type="number" id="windowSize" value="30" min="10" max="100">
+            </div>
+            <div>
+                <label for="stepSize">Step Size (bp):</label>
+                <input type="number" id="stepSize" value="1" min="1" max="10">
+            </div>
+            <div>
+                <label for="sequenceSelect">Select Sequence:</label>
+                <select id="sequenceSelect">
+                    <option value="">Select a sequence</option>
+                </select>
+            </div>
+            <button onclick="processFasta()">Process FASTA File</button>
+            <button onclick="downloadODS()" class="download">Download ODS Files</button>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div class="ods-info">
+            <h3>About ODS Files</h3>
+            <p>Objective Digital Stain (ODS) files contain the calculated patterns for each promoter sequence. Each file includes:</p>
+            <ul>
+                <li>Sequence ID and description</li>
+                <li>Window positions</li>
+                <li>C+G content (%) for each window</li>
+                <li>Kappa Index of Coincidence for each window</li>
+                <li>Center of weight calculation</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="sequencesContainer" style="display: none;">
+        <h3>Sequences Found</h3>
+        <div class="sequences-list" id="sequencesList"></div>
+    </div>
+
+    <div id="resultsSection" style="display: none;">
+        <h2>Analysis Results for Selected Sequence</h2>
+
+        <div class="results">
+            <div class="result-box">
+                <h3>Sequence ID</h3>
+                <div class="result-value" id="sequenceId">--</div>
+            </div>
+            <div class="result-box">
+                <h3>Sequence Length</h3>
+                <div class="result-value" id="sequenceLength">--</div>
+            </div>
+            <div class="result-box">
+                <h3>Overall C+G Content</h3>
+                <div class="result-value" id="overallCG">--</div>
+            </div>
+            <div class="result-box">
+                <h3>Center of Weight</h3>
+                <div class="result-value" id="centerWeight">--</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="canvas-container">
+        <div>
+            <h3>C+G% and IC Pattern</h3>
+            <p>Sliding window analysis of the selected promoter sequence</p>
+            <canvas id="patternChart" width="1000" height="400"></canvas>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #3498db;"></div>
+                    <span>C+G Content (%)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #e74c3c;"></div>
+                    <span>Index of Coincidence</span>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3>Pattern Centers Distribution</h3>
+            <p>Centers of each sliding window pattern</p>
+            <canvas id="centerChart" width="1000" height="300"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Include JSZip for creating zip files -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+<script>
+    // Global variables
+    let sequences = [];
+    let currentSequenceIndex = -1;
+    let odsData = {};
+
+    // FASTA parsing function
+    function parseFasta(content) {
+        const lines = content.split('\n');
+        const sequences = [];
+        let currentId = '';
+        let currentDesc = '';
+        let currentSeq = '';
+
+        for (let line of lines) {
+            line = line.trim();
+
+            if (line.startsWith('>')) {
+                // Save previous sequence if exists
+                if (currentId) {
+                    sequences.push({
+                        id: currentId,
+                        description: currentDesc,
+                        sequence: currentSeq.replace(/\s/g, '').toUpperCase()
+                    });
+                }
+
+                // Parse header
+                const header = line.substring(1);
+                const parts = header.split(/\s+/);
+                currentId = parts[0];
+                currentDesc = parts.slice(1).join(' ') || 'No description';
+                currentSeq = '';
+            } else if (line && !line.startsWith(';')) {
+                // Skip comment lines and accumulate sequence
+                currentSeq += line;
+            }
+        }
+
+        // Save last sequence
+        if (currentId && currentSeq) {
+            sequences.push({
+                id: currentId,
+                description: currentDesc,
+                sequence: currentSeq.replace(/\s/g, '').toUpperCase()
+            });
+        }
+
+        return sequences;
+    }
+
+    // DNA analysis functions
+    function calculateCGContent(sequence) {
+        if (!sequence || sequence.length === 0) return 0;
+
+        let cgCount = 0;
+        for (let i = 0; i < sequence.length; i++) {
+            const base = sequence[i];
+            if (base === 'C' || base === 'G') {
+                cgCount++;
+            }
+        }
+
+        return (cgCount / sequence.length) * 100;
+    }
+
+    function calculateIndexCoincidence(sequence) {
+        if (!sequence || sequence.length < 2) return 0;
+
+        const counts = { A: 0, T: 0, C: 0, G: 0 };
+
+        for (let i = 0; i < sequence.length; i++) {
+            const base = sequence[i];
+            if (counts.hasOwnProperty(base)) {
+                counts[base]++;
+            }
+        }
+
+        let sum = 0;
+        const total = sequence.length;
+
+        for (const base in counts) {
+            const ni = counts[base];
+            sum += ni * (ni - 1);
+        }
+
+        return (sum / (total * (total - 1))) * 100;
+    }
+
+    function slidingWindowAnalysis(sequence, windowSize, stepSize) {
+        const patterns = [];
+
+        for (let i = 0; i <= sequence.length - windowSize; i += stepSize) {
+            const windowSeq = sequence.substring(i, i + windowSize);
+            const cgContent = calculateCGContent(windowSeq);
+            const icValue = calculateIndexCoincidence(windowSeq);
+
+            patterns.push({
+                start: i,
+                end: i + windowSize,
+                sequence: windowSeq,
+                cgContent: cgContent,
+                icValue: icValue,
+                center: i + (windowSize / 2)
+            });
+        }
+
+        return patterns;
+    }
+
+    function calculateCenterOfWeight(patterns) {
+        if (patterns.length === 0) return 0;
+
+        let weightedSum = 0;
+        let totalWeight = 0;
+
+        for (const pattern of patterns) {
+            const weight = (pattern.cgContent + pattern.icValue) / 2;
+            weightedSum += pattern.center * weight;
+            totalWeight += weight;
+        }
+
+        return weightedSum / totalWeight;
+    }
+
+    function generateODS(sequenceData, patterns, windowSize, stepSize) {
+        const lines = [];
+
+        // Header
+        lines.push(`# Objective Digital Stain (ODS) File`);
+        lines.push(`# Generated: ${new Date().toISOString()}`);
+        lines.push(`# Sequence ID: ${sequenceData.id}`);
+        lines.push(`# Description: ${sequenceData.description}`);
+        lines.push(`# Sequence Length: ${sequenceData.sequence.length}`);
+        lines.push(`# Window Size: ${windowSize} bp`);
+        lines.push(`# Step Size: ${stepSize} bp`);
+        lines.push(`# Center of Weight: ${calculateCenterOfWeight(patterns).toFixed(2)}`);
+        lines.push(``);
+
+        // Column headers
+        lines.push(`Window_Start\tWindow_End\tCenter_Position\tC+G_Percentage\tKappa_IC\tWindow_Sequence`);
+
+        // Data rows
+        patterns.forEach(pattern => {
+            lines.push([
+                pattern.start,
+                pattern.end,
+                pattern.center.toFixed(1),
+                pattern.cgContent.toFixed(2),
+                pattern.icValue.toFixed(2),
+                pattern.sequence
+            ].join('\t'));
+        });
+
+        return lines.join('\n');
+    }
+
+    function processFasta() {
+        const fileInput = document.getElementById('fastaFile');
+        const windowSize = parseInt(document.getElementById('windowSize').value);
+        const stepSize = parseInt(document.getElementById('stepSize').value);
+
+        if (!fileInput.files[0]) {
+            showStatus('Please select a FASTA file first!', 'error');
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            try {
+                const content = e.target.result;
+                sequences = parseFasta(content);
+
+                if (sequences.length === 0) {
+                    showStatus('No valid sequences found in the FASTA file!', 'error');
+                    return;
+                }
+
+                showStatus(`Found ${sequences.length} promoter sequences`, 'success');
+
+                // Process all sequences
+                odsData = {};
+                sequences.forEach((seq, index) => {
+                    const patterns = slidingWindowAnalysis(seq.sequence, windowSize, stepSize);
+                    odsData[seq.id] = {
+                        patterns: patterns,
+                        odsContent: generateODS(seq, patterns, windowSize, stepSize)
+                    };
+                });
+
+                // Populate sequence list
+                populateSequenceList();
+
+                // Select first sequence by default
+                if (sequences.length > 0) {
+                    selectSequence(0);
+                }
+
+            } catch (error) {
+                showStatus(`Error processing file: ${error.message}`, 'error');
+            }
+        };
+
+        reader.onerror = function() {
+            showStatus('Error reading file!', 'error');
+        };
+
+        reader.readAsText(file);
+    }
+
+    function populateSequenceList() {
+        const sequencesList = document.getElementById('sequencesList');
+        const sequenceSelect = document.getElementById('sequenceSelect');
+        const sequencesContainer = document.getElementById('sequencesContainer');
+
+        sequencesList.innerHTML = '';
+        sequenceSelect.innerHTML = '<option value="">Select a sequence</option>';
+
+        sequences.forEach((seq, index) => {
+            // Add to dropdown
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = `${seq.id} - ${seq.description.substring(0, 50)}${seq.description.length > 50 ? '...' : ''}`;
+            sequenceSelect.appendChild(option);
+
+            // Add to list
+            const item = document.createElement('div');
+            item.className = 'sequence-item';
+            item.innerHTML = `
+                    <strong>${seq.id}</strong>
+                    <div style="font-size: 12px; color: #666;">${seq.description}</div>
+                    <div style="font-size: 12px;">Length: ${seq.sequence.length} bp</div>
+                `;
+            item.addEventListener('click', () => selectSequence(index));
+            sequencesList.appendChild(item);
+        });
+
+        sequencesContainer.style.display = 'block';
+
+        // Add change listener to dropdown
+        sequenceSelect.addEventListener('change', function() {
+            const index = parseInt(this.value);
+            if (!isNaN(index) && index >= 0) {
+                selectSequence(index);
+            }
+        });
+    }
+
+    function selectSequence(index) {
+        currentSequenceIndex = index;
+        const seq = sequences[index];
+        const patterns = odsData[seq.id].patterns;
+
+        // Update UI
+        document.getElementById('sequenceId').textContent = seq.id;
+        document.getElementById('sequenceLength').textContent = `${seq.sequence.length} bp`;
+        document.getElementById('overallCG').textContent = calculateCGContent(seq.sequence).toFixed(2) + '%';
+        document.getElementById('centerWeight').textContent = calculateCenterOfWeight(patterns).toFixed(2);
+
+        // Show results section
+        document.getElementById('resultsSection').style.display = 'block';
+
+        // Update active item in list
+        document.querySelectorAll('.sequence-item').forEach((item, i) => {
+            item.classList.toggle('active', i === index);
+        });
+
+        // Update dropdown
+        document.getElementById('sequenceSelect').value = index;
+
+        // Draw charts
+        drawPatternChart(patterns, seq.sequence.length);
+        drawCenterChart(patterns, seq.sequence.length);
+
+        showStatus(`Selected sequence: ${seq.id}`, 'success');
+    }
+
+    function downloadODS() {
+        if (Object.keys(odsData).length === 0) {
+            showStatus('Please process a FASTA file first!', 'error');
+            return;
+        }
+
+        const zip = new JSZip();
+        const folder = zip.folder("ODS_Files");
+
+        // Add each ODS file
+        sequences.forEach(seq => {
+            const filename = `${seq.id.replace(/[^a-z0-9]/gi, '_')}_ODS.txt`;
+            folder.file(filename, odsData[seq.id].odsContent);
+        });
+
+        // Add readme file
+        const readme = `Objective Digital Stain (ODS) Files
+Generated: ${new Date().toISOString()}
+Total Sequences: ${sequences.length}
+Window Size: ${document.getElementById('windowSize').value} bp
+Step Size: ${document.getElementById('stepSize').value} bp
+
+Each ODS file contains:
+- Tab-separated values (TSV format)
+- Window positions and statistics
+- C+G percentage for each window
+- Kappa Index of Coincidence for each window
+- Sequence information`;
+
+        folder.file("README.txt", readme);
+
+        // Generate and download zip
+        zip.generateAsync({type: "blob"})
+            .then(function(content) {
+                saveAs(content, "Promoter_ODS_Files.zip");
+                showStatus(`Downloaded ${sequences.length} ODS files as ZIP archive`, 'success');
+            })
+            .catch(function(error) {
+                showStatus(`Error creating ZIP file: ${error.message}`, 'error');
+            });
+    }
+
+    // Chart drawing functions
+    function drawPatternChart(patterns, seqLength) {
+        const canvas = document.getElementById('patternChart');
+        const ctx = canvas.getContext('2d');
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!patterns || patterns.length === 0) return;
+
+        // Setup chart dimensions
+        const padding = 50;
+        const chartWidth = canvas.width - padding * 2;
+        const chartHeight = canvas.height - padding * 2;
+
+        // Find min and max values
+        let minCG = Infinity, maxCG = -Infinity;
+        let minIC = Infinity, maxIC = -Infinity;
+
+        patterns.forEach(pattern => {
+            minCG = Math.min(minCG, pattern.cgContent);
+            maxCG = Math.max(maxCG, pattern.cgContent);
+            minIC = Math.min(minIC, pattern.icValue);
+            maxIC = Math.max(maxIC, pattern.icValue);
+        });
+
+        const minValue = Math.min(minCG, minIC);
+        const maxValue = Math.max(maxCG, maxIC);
+
+        // Draw grid
+        drawGrid(ctx, padding, chartWidth, chartHeight, minValue, maxValue, patterns);
+
+        // Plot C+G Content
+        ctx.beginPath();
+        ctx.strokeStyle = '#3498db';
+        ctx.lineWidth = 2;
+
+        patterns.forEach((pattern, index) => {
+            const x = padding + (index / (patterns.length - 1)) * chartWidth;
+            const y = canvas.height - padding - ((pattern.cgContent - minValue) / (maxValue - minValue)) * chartHeight;
+
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+        ctx.stroke();
+
+        // Plot Index of Coincidence
+        ctx.beginPath();
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 2;
+
+        patterns.forEach((pattern, index) => {
+            const x = padding + (index / (patterns.length - 1)) * chartWidth;
+            const y = canvas.height - padding - ((pattern.icValue - minValue) / (maxValue - minValue)) * chartHeight;
+
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+        ctx.stroke();
+
+        // Add chart title
+        ctx.fillStyle = '#2c3e50';
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText('DNA Pattern Analysis (C+G% vs Kappa IC)', canvas.width / 2 - 150, 30);
+    }
+
+    function drawCenterChart(patterns, seqLength) {
+        const canvas = document.getElementById('centerChart');
+        const ctx = canvas.getContext('2d');
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!patterns || patterns.length === 0) return;
+
+        // Setup chart dimensions
+        const padding = 50;
+        const chartWidth = canvas.width - padding * 2;
+        const chartHeight = canvas.height - padding * 2;
+
+        // Draw sequence indicator
+        ctx.fillStyle = '#3498db';
+        ctx.fillRect(padding, padding + 20, chartWidth, 10);
+
+        // Draw pattern centers
+        ctx.fillStyle = '#e74c3c';
+        patterns.forEach(pattern => {
+            const x = padding + (pattern.center / seqLength) * chartWidth;
+            const y = canvas.height / 2;
+
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw connection line
+            ctx.beginPath();
+            ctx.moveTo(x, y - 4);
+            ctx.lineTo(x, padding + 30);
+            ctx.strokeStyle = 'rgba(231, 76, 60, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        });
+
+        // Add labels
+        ctx.fillStyle = '#2c3e50';
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText('Pattern Centers Distribution', canvas.width / 2 - 100, 30);
+
+        // Add scale
+        ctx.font = '12px Arial';
+        ctx.fillText('0 bp', padding - 10, padding + 40);
+        ctx.fillText(`${seqLength} bp`, padding + chartWidth - 20, padding + 40);
+    }
+
+    function drawGrid(ctx, padding, chartWidth, chartHeight, minValue, maxValue, patterns) {
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 1;
+
+        // Vertical grid lines
+        for (let i = 0; i <= 10; i++) {
+            const x = padding + (i / 10) * chartWidth;
+            ctx.beginPath();
+            ctx.moveTo(x, padding);
+            ctx.lineTo(x, padding + chartHeight);
+            ctx.stroke();
+
+            // X-axis labels
+            if (patterns.length > 0 && i % 2 === 0) {
+                const windowNum = Math.floor((i / 10) * (patterns.length - 1));
+                ctx.fillStyle = '#666';
+                ctx.font = '10px Arial';
+                ctx.fillText(`W${windowNum}`, x - 5, padding + chartHeight + 15);
+            }
+        }
+
+        // Horizontal grid lines
+        for (let i = 0; i <= 10; i++) {
+            const y = padding + (i / 10) * chartHeight;
+            ctx.beginPath();
+            ctx.moveTo(padding, y);
+            ctx.lineTo(padding + chartWidth, y);
+            ctx.stroke();
+
+            // Y-axis labels
+            const value = minValue + ((10 - i) / 10) * (maxValue - minValue);
+            ctx.fillStyle = '#666';
+            ctx.font = '10px Arial';
+            ctx.fillText(value.toFixed(0), padding - 25, y + 3);
+        }
+
+        // Draw axes
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding, padding);
+        ctx.lineTo(padding, padding + chartHeight);
+        ctx.lineTo(padding + chartWidth, padding + chartHeight);
+        ctx.stroke();
+    }
+
+    function showStatus(message, type) {
+        const status = document.getElementById('status');
+        status.textContent = message;
+        status.className = `status ${type}`;
+        status.style.display = 'block';
+
+        // Auto-hide success messages after 5 seconds
+        if (type === 'success') {
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 5000);
+        }
+    }
+</script>
+</body>
+</html>

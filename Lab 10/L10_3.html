@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Influenza Genome ODS Analyzer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .file-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #3498db;
+            border-radius: 10px;
+            background-color: #f8f9fa;
+            text-align: center;
+        }
+        input[type="file"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 80%;
+            max-width: 400px;
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        input[type="number"] {
+            width: 80px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .canvas-container {
+            margin: 30px 0;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            background-color: white;
+            width: 100%;
+            display: block;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .stat-item {
+            padding: 10px;
+            background-color: #f0f8ff;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-value {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .sequence-info {
+            font-family: monospace;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Influenza Genome ODS Analyzer</h1>
+
+    <div class="file-section">
+        <h2>Load Influenza FASTA File</h2>
+        <p>Select a FASTA file containing 10 influenza genomes</p>
+        <input type="file" id="fastaFile" accept=".fasta,.fa,.txt">
+
+        <div class="controls">
+            <div>
+                <label for="windowSize">Window:</label>
+                <input type="number" id="windowSize" value="30" min="10" max="100">
+            </div>
+            <div>
+                <label for="stepSize">Step:</label>
+                <input type="number" id="stepSize" value="1" min="1" max="10">
+            </div>
+            <button onclick="analyzeGenomes()">Analyze Genomes</button>
+        </div>
+
+        <div id="fileInfo" style="display: none; margin-top: 15px;">
+            <div class="stats" id="statsContainer"></div>
+        </div>
+    </div>
+
+    <div id="resultsSection" style="display: none;">
+        <h2>ODS Patterns (All 10 Genomes)</h2>
+        <div class="canvas-container">
+            <canvas id="odsChart" width="1000" height="500"></canvas>
+        </div>
+
+        <h2>ODS Centers Distribution</h2>
+        <p>Center of weight for each genome's pattern (labeled by name)</p>
+        <div class="canvas-container">
+            <canvas id="centerChart" width="1000" height="400"></canvas>
+        </div>
+
+        <h2>Genome Information</h2>
+        <div class="sequence-info" id="sequenceInfo"></div>
+    </div>
+</div>
+
+<script>
+    // Storage for genomes and their ODS data
+    let genomes = [];
+    let odsPatterns = [];
+    let colorPalette = [
+        '#FF6B6B', '#4ECDC4', '#FFD166', '#06D6A0', '#118AB2',
+        '#EF476F', '#073B4C', '#7209B7', '#F3722C', '#90BE6D'
+    ];
+
+    // Parse FASTA file
+    function parseFasta(content) {
+        const sequences = [];
+        const lines = content.split('\n');
+        let currentId = '';
+        let currentDesc = '';
+        let currentSeq = '';
+
+        for (let line of lines) {
+            line = line.trim();
+
+            if (line.startsWith('>')) {
+                if (currentId) {
+                    sequences.push({
+                        id: currentId,
+                        description: currentDesc,
+                        sequence: currentSeq.replace(/\s/g, '').toUpperCase(),
+                        length: currentSeq.length
+                    });
+                }
+
+                const header = line.substring(1);
+                const parts = header.split(/\s+/);
+                currentId = parts[0];
+                currentDesc = parts.slice(1).join(' ') || '';
+                currentSeq = '';
+            } else if (line && !line.startsWith(';')) {
+                currentSeq += line;
+            }
+        }
+
+        if (currentId && currentSeq) {
+            sequences.push({
+                id: currentId,
+                description: currentDesc,
+                sequence: currentSeq.replace(/\s/g, '').toUpperCase(),
+                length: currentSeq.length
+            });
+        }
+
+        return sequences;
+    }
+
+    // Calculate C+G content for a sequence
+    function calculateCGContent(seq) {
+        if (!seq) return 0;
+        let cgCount = 0;
+        for (let i = 0; i < seq.length; i++) {
+            const base = seq[i];
+            if (base === 'C' || base === 'G') cgCount++;
+        }
+        return (cgCount / seq.length) * 100;
+    }
+
+    // Calculate Index of Coincidence
+    function calculateIC(seq) {
+        if (!seq || seq.length < 2) return 0;
+        const counts = { A: 0, T: 0, C: 0, G: 0 };
+        for (let i = 0; i < seq.length; i++) {
+            const base = seq[i];
+            if (counts.hasOwnProperty(base)) counts[base]++;
+        }
+        let sum = 0;
+        const total = seq.length;
+        for (const base in counts) {
+            const ni = counts[base];
+            sum += ni * (ni - 1);
+        }
+        return (sum / (total * (total - 1))) * 100;
+    }
+
+    // Generate ODS pattern for a genome
+    function generateODSPattern(genome, windowSize, stepSize) {
+        const patterns = [];
+        const seq = genome.sequence;
+
+        for (let i = 0; i <= seq.length - windowSize; i += stepSize) {
+            const windowSeq = seq.substring(i, i + windowSize);
+            const cg = calculateCGContent(windowSeq);
+            const ic = calculateIC(windowSeq);
+
+            patterns.push({
+                position: i + (windowSize / 2),
+                cg: cg,
+                ic: ic,
+                windowStart: i
+            });
+        }
+
+        // Calculate center of weight
+        let weightedSum = 0;
+        let totalWeight = 0;
+        patterns.forEach(pattern => {
+            const weight = (pattern.cg + pattern.ic) / 2;
+            weightedSum += pattern.position * weight;
+            totalWeight += weight;
+        });
+
+        return {
+            patterns: patterns,
+            centerOfWeight: weightedSum / totalWeight,
+            genome: genome
+        };
+    }
+
+    // Main analysis function
+    function analyzeGenomes() {
+        const fileInput = document.getElementById('fastaFile');
+        const windowSize = parseInt(document.getElementById('windowSize').value);
+        const stepSize = parseInt(document.getElementById('stepSize').value);
+
+        if (!fileInput.files[0]) {
+            alert('Please select a FASTA file first');
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            const content = e.target.result;
+            genomes = parseFasta(content);
+
+            if (genomes.length === 0) {
+                alert('No valid sequences found in the FASTA file');
+                return;
+            }
+
+            // Clear previous data
+            odsPatterns = [];
+
+            // Generate ODS for each genome
+            genomes.forEach((genome, index) => {
+                const ods = generateODSPattern(genome, windowSize, stepSize);
+                ods.color = colorPalette[index % colorPalette.length];
+                odsPatterns.push(ods);
+            });
+
+            // Update UI
+            updateStats();
+            drawODSChart();
+            drawCenterChart();
+
+            // Show results
+            document.getElementById('fileInfo').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'block';
+
+            console.log('Analysis complete:', odsPatterns.length, 'genomes processed');
+        };
+
+        reader.readAsText(file);
+    }
+
+    // Update statistics display
+    function updateStats() {
+        const statsContainer = document.getElementById('statsContainer');
+        const seqInfo = document.getElementById('sequenceInfo');
+
+        statsContainer.innerHTML = '';
+        seqInfo.innerHTML = '';
+
+        odsPatterns.forEach((ods, index) => {
+            // Add to stats
+            const statDiv = document.createElement('div');
+            statDiv.className = 'stat-item';
+            statDiv.innerHTML = `
+                    <div style="color: ${ods.color}; font-weight: bold;">${ods.genome.id}</div>
+                    <div class="stat-value">${ods.genome.length} bp</div>
+                    <div>C+G: ${calculateCGContent(ods.genome.sequence).toFixed(1)}%</div>
+                `;
+            statsContainer.appendChild(statDiv);
+
+            // Add to sequence info
+            const infoDiv = document.createElement('div');
+            infoDiv.innerHTML = `<strong style="color: ${ods.color}">${ods.genome.id}</strong> - ${ods.genome.description}<br>
+                    Length: ${ods.genome.length}bp | Windows: ${ods.patterns.length} | Center: ${ods.centerOfWeight.toFixed(1)}<br>`;
+            seqInfo.appendChild(infoDiv);
+        });
+    }
+
+    // Draw ODS patterns chart
+    function drawODSChart() {
+        const canvas = document.getElementById('odsChart');
+        const ctx = canvas.getContext('2d');
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (odsPatterns.length === 0) return;
+
+        // Setup chart
+        const padding = { top: 50, right: 50, bottom: 70, left: 60 };
+        const chartWidth = canvas.width - padding.left - padding.right;
+        const chartHeight = canvas.height - padding.top - padding.bottom;
+
+        // Find global min/max values
+        let minCG = Infinity, maxCG = -Infinity;
+        let minIC = Infinity, maxIC = -Infinity;
+        let maxPatterns = 0;
+
+        odsPatterns.forEach(ods => {
+            ods.patterns.forEach(pattern => {
+                minCG = Math.min(minCG, pattern.cg);
+                maxCG = Math.max(maxCG, pattern.cg);
+                minIC = Math.min(minIC, pattern.ic);
+                maxIC = Math.max(maxIC, pattern.ic);
+            });
+            maxPatterns = Math.max(maxPatterns, ods.patterns.length);
+        });
+
+        const minValue = Math.min(minCG, minIC);
+        const maxValue = Math.max(maxCG, maxIC);
+
+        // Draw grid
+        drawGrid(ctx, padding, chartWidth, chartHeight, minValue, maxValue, maxPatterns);
+
+        // Draw each genome's patterns
+        odsPatterns.forEach((ods, genomeIndex) => {
+            const patterns = ods.patterns;
+
+            // Draw C+G pattern
+            ctx.beginPath();
+            ctx.strokeStyle = ods.color;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([]);
+
+            patterns.forEach((pattern, patternIndex) => {
+                const x = padding.left + (patternIndex / (patterns.length - 1)) * chartWidth;
+                const y = canvas.height - padding.bottom - ((pattern.cg - minValue) / (maxValue - minValue)) * chartHeight;
+
+                if (patternIndex === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.stroke();
+
+            // Draw IC pattern (dashed)
+            ctx.beginPath();
+            ctx.strokeStyle = ods.color;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 5]);
+
+            patterns.forEach((pattern, patternIndex) => {
+                const x = padding.left + (patternIndex / (patterns.length - 1)) * chartWidth;
+                const y = canvas.height - padding.bottom - ((pattern.ic - minValue) / (maxValue - minValue)) * chartHeight;
+
+                if (patternIndex === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.stroke();
+            ctx.setLineDash([]);
+        });
+
+        // Add legend
+        const legendX = padding.left;
+        let legendY = 20;
+        const legendItemHeight = 20;
+
+        ctx.font = '12px Arial';
+        ctx.fillStyle = '#333';
+        ctx.fillText('C+G% (solid), IC (dashed)', legendX, legendY);
+        legendY += 20;
+
+        odsPatterns.forEach((ods, index) => {
+            ctx.fillStyle = ods.color;
+            ctx.fillRect(legendX, legendY, 15, 10);
+            ctx.fillStyle = '#333';
+            ctx.fillText(ods.genome.id, legendX + 20, legendY + 10);
+            legendY += legendItemHeight;
+        });
+
+        // Chart title
+        ctx.font = 'bold 16px Arial';
+        ctx.fillStyle = '#2c3e50';
+        ctx.fillText('Influenza Genome ODS Patterns', canvas.width / 2 - 100, 30);
+
+        // Axis labels
+        ctx.font = '14px Arial';
+        ctx.fillText('Window Position', canvas.width / 2 - 40, canvas.height - 10);
+        ctx.save();
+        ctx.translate(30, canvas.height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('Value (%)', 0, 0);
+        ctx.restore();
+    }
+
+    // Draw centers distribution chart
+    function drawCenterChart() {
+        const canvas = document.getElementById('centerChart');
+        const ctx = canvas.getContext('2d');
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (odsPatterns.length === 0) return;
+
+        // Setup chart
+        const padding = { top: 50, right: 50, bottom: 100, left: 60 };
+        const chartWidth = canvas.width - padding.left - padding.right;
+        const chartHeight = canvas.height - padding.top - padding.bottom;
+
+        // Find min/max centers
+        let minCenter = Infinity, maxCenter = -Infinity;
+        odsPatterns.forEach(ods => {
+            minCenter = Math.min(minCenter, ods.centerOfWeight);
+            maxCenter = Math.max(maxCenter, ods.centerOfWeight);
+        });
+
+        // Add some padding to the range
+        const range = maxCenter - minCenter;
+        minCenter -= range * 0.1;
+        maxCenter += range * 0.1;
+
+        // Draw grid and axes
+        drawCenterGrid(ctx, padding, chartWidth, chartHeight, minCenter, maxCenter);
+
+        // Draw each center
+        const dotRadius = 8;
+
+        odsPatterns.forEach((ods, index) => {
+            const x = padding.left + ((ods.centerOfWeight - minCenter) / (maxCenter - minCenter)) * chartWidth;
+            const y = padding.top + (chartHeight / 2);
+
+            // Draw connecting line
+            ctx.beginPath();
+            ctx.moveTo(x, padding.top + 20);
+            ctx.lineTo(x, y - dotRadius);
+            ctx.strokeStyle = ods.color + '80'; // Semi-transparent
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Draw dot
+            ctx.beginPath();
+            ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+            ctx.fillStyle = ods.color;
+            ctx.fill();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Draw label
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+
+            // Break long labels
+            const label = ods.genome.id;
+            const maxChars = 20;
+            let displayLabel = label;
+            if (label.length > maxChars) {
+                displayLabel = label.substring(0, maxChars) + '...';
+            }
+
+            // Position label above or below based on index
+            const labelY = y + dotRadius + 20;
+            ctx.fillText(displayLabel, x, labelY);
+
+            // Add center value
+            ctx.font = '10px Arial';
+            ctx.fillText(`Center: ${ods.centerOfWeight.toFixed(1)}`, x, labelY + 15);
+        });
+
+        // Chart title
+        ctx.fillStyle = '#2c3e50';
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText('ODS Centers of Weight', canvas.width / 2 - 80, 30);
+
+        // X-axis label
+        ctx.font = '14px Arial';
+        ctx.fillText('Center Position (bp)', canvas.width / 2 - 60, canvas.height - 20);
+    }
+
+    // Utility: Draw grid for ODS chart
+    function drawGrid(ctx, padding, chartWidth, chartHeight, minValue, maxValue, maxPatterns) {
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 1;
+
+        // Vertical grid
+        for (let i = 0; i <= 10; i++) {
+            const x = padding.left + (i / 10) * chartWidth;
+            ctx.beginPath();
+            ctx.moveTo(x, padding.top);
+            ctx.lineTo(x, padding.top + chartHeight);
+            ctx.stroke();
+        }
+
+        // Horizontal grid
+        for (let i = 0; i <= 10; i++) {
+            const y = padding.top + (i / 10) * chartHeight;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, y);
+            ctx.lineTo(padding.left + chartWidth, y);
+            ctx.stroke();
+
+            // Y-axis labels
+            const value = minValue + ((10 - i) / 10) * (maxValue - minValue);
+            ctx.fillStyle = '#666';
+            ctx.font = '10px Arial';
+            ctx.fillText(value.toFixed(0), padding.left - 25, y + 3);
+        }
+
+        // Axes
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, padding.top);
+        ctx.lineTo(padding.left, padding.top + chartHeight);
+        ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight);
+        ctx.stroke();
+    }
+
+    // Utility: Draw grid for center chart
+    function drawCenterGrid(ctx, padding, chartWidth, chartHeight, minCenter, maxCenter) {
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 1;
+
+        // Vertical grid
+        for (let i = 0; i <= 10; i++) {
+            const x = padding.left + (i / 10) * chartWidth;
+            ctx.beginPath();
+            ctx.moveTo(x, padding.top);
+            ctx.lineTo(x, padding.top + chartHeight);
+            ctx.stroke();
+
+            // X-axis labels
+            const centerValue = minCenter + (i / 10) * (maxCenter - minCenter);
+            ctx.fillStyle = '#666';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(centerValue.toFixed(0), x, padding.top + chartHeight + 15);
+        }
+
+        // Horizontal center line
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const centerY = padding.top + (chartHeight / 2);
+        ctx.moveTo(padding.left, centerY);
+        ctx.lineTo(padding.left + chartWidth, centerY);
+        ctx.stroke();
+
+        // Axes
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, padding.top);
+        ctx.lineTo(padding.left, padding.top + chartHeight);
+        ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight);
+        ctx.stroke();
+    }
+
+    // Load example data on page load
+    window.onload = function() {
+        // Create a default FASTA content with 10 influenza-like sequences
+        const exampleFasta = `>Influenza_A_H1N1_California_2009
+ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG
+
+>Influenza_A_H3N2_HongKong_2019
+GATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATC
+
+>Influenza_B_Victoria_2020
+CGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGAT
+
+>Influenza_B_Yamagata_2018
+TCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGA
+
+>Influenza_C_Tokyo_2017
+ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG
+
+>Influenza_A_H5N1_Vietnam_2005
+GATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATC
+
+>Influenza_A_H7N9_China_2013
+CGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGAT
+
+>Influenza_A_H9N2_HongKong_2021
+TCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGA
+
+>Influenza_B_Phuket_2016
+ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG
+
+>Influenza_D_Oklahoma_2014
+GATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATC`;
+
+        // Create a blob and simulate file upload
+        const blob = new Blob([exampleFasta], {type: 'text/plain'});
+        const file = new File([blob], "influenza_genomes.fasta", {type: "text/plain"});
+
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        document.getElementById('fastaFile').files = dataTransfer.files;
+
+        console.log('Example FASTA file loaded with 10 influenza genomes');
+    };
+</script>
+</body>
+</html>

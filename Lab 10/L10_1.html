@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNA Pattern Analyzer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .input-section, .results-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        input[type="number"] {
+            width: 100px;
+            padding: 5px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .canvas-container {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            margin: 20px 0;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            background-color: white;
+            width: 100%;
+        }
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .result-box {
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        .result-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .sequence-display {
+            font-family: monospace;
+            background-color: #f1f8ff;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: nowrap;
+            margin: 10px 0;
+        }
+        .window-highlight {
+            background-color: #ffeb3b;
+            padding: 2px 0;
+        }
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>DNA Pattern Analyzer</h1>
+
+    <div class="input-section">
+        <h2>DNA Sequence Input</h2>
+        <textarea id="dnaSequence">CGGACTGATCTATCTAAAAAAAAAAAAAAAAAAAAAAAAAAACGTAGCATCTATCGATCTATCTAGCGATCTATCTACTACG</textarea>
+
+        <div class="controls">
+            <div>
+                <label for="windowSize">Window Size:</label>
+                <input type="number" id="windowSize" value="30" min="10" max="100">
+            </div>
+            <div>
+                <label for="stepSize">Step Size:</label>
+                <input type="number" id="stepSize" value="1" min="1" max="10">
+            </div>
+            <button onclick="analyzeSequence()">Analyze DNA Sequence</button>
+        </div>
+    </div>
+
+    <div class="sequence-display" id="sequenceDisplay"></div>
+
+    <div class="results-section">
+        <h2>Analysis Results</h2>
+
+        <div class="results-grid">
+            <div class="result-box">
+                <h3>C+G Content</h3>
+                <div class="result-value" id="cgContentResult">--</div>
+                <p>Percentage of Cytosine and Guanine in the sequence</p>
+            </div>
+
+            <div class="result-box">
+                <h3>Kappa Index of Coincidence</h3>
+                <div class="result-value" id="icResult">--</div>
+                <p>Measure of non-randomness in DNA sequence</p>
+            </div>
+
+            <div class="result-box">
+                <h3>Center of Weight</h3>
+                <div class="result-value" id="centerWeightResult">--</div>
+                <p>Weighted average position of pattern values</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="canvas-container">
+        <div>
+            <h3>DNA Pattern Analysis</h3>
+            <p>C+G% and IC values across sliding windows</p>
+            <canvas id="patternChart" width="1000" height="400"></canvas>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #3498db;"></div>
+                    <span>C+G Content (%)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #e74c3c;"></div>
+                    <span>Index of Coincidence</span>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3>Pattern Centers Distribution</h3>
+            <p>Centers of each sliding window pattern</p>
+            <canvas id="centerChart" width="1000" height="300"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    // DNA sequence functions
+    function calculateCGContent(sequence) {
+        if (!sequence || sequence.length === 0) return 0;
+
+        const upperSeq = sequence.toUpperCase();
+        let cgCount = 0;
+
+        for (let i = 0; i < upperSeq.length; i++) {
+            const base = upperSeq[i];
+            if (base === 'C' || base === 'G') {
+                cgCount++;
+            }
+        }
+
+        return (cgCount / sequence.length) * 100;
+    }
+
+    function calculateIndexCoincidence(sequence) {
+        if (!sequence || sequence.length < 2) return 0;
+
+        const upperSeq = sequence.toUpperCase();
+        const counts = { A: 0, T: 0, C: 0, G: 0 };
+
+        // Count each nucleotide
+        for (let i = 0; i < upperSeq.length; i++) {
+            const base = upperSeq[i];
+            if (counts.hasOwnProperty(base)) {
+                counts[base]++;
+            }
+        }
+
+        // Calculate Index of Coincidence (Kappa)
+        let sum = 0;
+        const total = upperSeq.length;
+
+        for (const base in counts) {
+            const ni = counts[base];
+            sum += ni * (ni - 1);
+        }
+
+        return (sum / (total * (total - 1))) * 100;
+    }
+
+    function analyzeSequence() {
+        const sequence = document.getElementById('dnaSequence').value.trim();
+        const windowSize = parseInt(document.getElementById('windowSize').value);
+        const stepSize = parseInt(document.getElementById('stepSize').value);
+
+        if (!sequence) {
+            alert('Please enter a DNA sequence');
+            return;
+        }
+
+        // Display sequence with highlighting
+        displaySequence(sequence, windowSize);
+
+        // Calculate overall values
+        const cgContent = calculateCGContent(sequence);
+        const icValue = calculateIndexCoincidence(sequence);
+
+        document.getElementById('cgContentResult').textContent = cgContent.toFixed(2) + '%';
+        document.getElementById('icResult').textContent = icValue.toFixed(2);
+
+        // Perform sliding window analysis
+        const patterns = slidingWindowAnalysis(sequence, windowSize, stepSize);
+
+        // Calculate center of weight
+        const centerWeight = calculateCenterOfWeight(patterns);
+        document.getElementById('centerWeightResult').textContent = centerWeight.toFixed(2);
+
+        // Draw charts
+        drawPatternChart(patterns, windowSize, stepSize);
+        drawCenterChart(patterns, sequence.length, windowSize);
+    }
+
+    function slidingWindowAnalysis(sequence, windowSize, stepSize) {
+        const patterns = [];
+        const upperSeq = sequence.toUpperCase();
+
+        for (let i = 0; i <= upperSeq.length - windowSize; i += stepSize) {
+            const windowSeq = upperSeq.substring(i, i + windowSize);
+            const cgContent = calculateCGContent(windowSeq);
+            const icValue = calculateIndexCoincidence(windowSeq);
+
+            patterns.push({
+                start: i,
+                end: i + windowSize,
+                sequence: windowSeq,
+                cgContent: cgContent,
+                icValue: icValue,
+                center: i + (windowSize / 2)
+            });
+        }
+
+        return patterns;
+    }
+
+    function calculateCenterOfWeight(patterns) {
+        if (patterns.length === 0) return 0;
+
+        let weightedSum = 0;
+        let totalWeight = 0;
+
+        for (const pattern of patterns) {
+            const weight = (pattern.cgContent + pattern.icValue) / 2;
+            weightedSum += pattern.center * weight;
+            totalWeight += weight;
+        }
+
+        return weightedSum / totalWeight;
+    }
+
+    function displaySequence(sequence, windowSize) {
+        const displayDiv = document.getElementById('sequenceDisplay');
+        displayDiv.innerHTML = '';
+
+        for (let i = 0; i < sequence.length; i++) {
+            const span = document.createElement('span');
+            span.textContent = sequence[i];
+            span.title = `Position ${i + 1}`;
+
+            // Highlight windows
+            const windowIndex = Math.floor(i / windowSize);
+            if (windowIndex % 2 === 0) {
+                span.style.backgroundColor = '#ffeb3b';
+            }
+
+            displayDiv.appendChild(span);
+        }
+    }
+
+    // Chart drawing functions
+    function drawPatternChart(patterns, windowSize, stepSize) {
+        const canvas = document.getElementById('patternChart');
+        const ctx = canvas.getContext('2d');
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (patterns.length === 0) return;
+
+        // Setup chart dimensions
+        const padding = 50;
+        const chartWidth = canvas.width - padding * 2;
+        const chartHeight = canvas.height - padding * 2;
+
+        // Find min and max values
+        let minCG = Infinity, maxCG = -Infinity;
+        let minIC = Infinity, maxIC = -Infinity;
+
+        patterns.forEach(pattern => {
+            minCG = Math.min(minCG, pattern.cgContent);
+            maxCG = Math.max(maxCG, pattern.cgContent);
+            minIC = Math.min(minIC, pattern.icValue);
+            maxIC = Math.max(maxIC, pattern.icValue);
+        });
+
+        const minValue = Math.min(minCG, minIC);
+        const maxValue = Math.max(maxCG, maxIC);
+
+        // Draw grid and axes
+        drawGrid(ctx, padding, chartWidth, chartHeight, minValue, maxValue, patterns.length);
+
+        // Plot C+G Content
+        ctx.beginPath();
+        ctx.strokeStyle = '#3498db';
+        ctx.lineWidth = 2;
+
+        patterns.forEach((pattern, index) => {
+            const x = padding + (index / (patterns.length - 1)) * chartWidth;
+            const y = canvas.height - padding - ((pattern.cgContent - minValue) / (maxValue - minValue)) * chartHeight;
+
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+        ctx.stroke();
+
+        // Plot Index of Coincidence
+        ctx.beginPath();
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 2;
+
+        patterns.forEach((pattern, index) => {
+            const x = padding + (index / (patterns.length - 1)) * chartWidth;
+            const y = canvas.height - padding - ((pattern.icValue - minValue) / (maxValue - minValue)) * chartHeight;
+
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+        ctx.stroke();
+
+        // Add chart title and labels
+        ctx.fillStyle = '#2c3e50';
+        ctx.font = '16px Arial';
+        ctx.fillText('DNA Pattern Analysis', canvas.width / 2 - 80, 30);
+
+        ctx.font = '12px Arial';
+        ctx.fillText('Window Position', canvas.width / 2 - 40, canvas.height - 10);
+
+        ctx.save();
+        ctx.translate(20, canvas.height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('Value (%)', 0, 0);
+        ctx.restore();
+    }
+
+    function drawCenterChart(patterns, sequenceLength, windowSize) {
+        const canvas = document.getElementById('centerChart');
+        const ctx = canvas.getContext('2d');
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (patterns.length === 0) return;
+
+        // Setup chart dimensions
+        const padding = 50;
+        const chartWidth = canvas.width - padding * 2;
+        const chartHeight = canvas.height - padding * 2;
+
+        // Draw grid
+        ctx.strokeStyle = '#ddd';
+        ctx.lineWidth = 1;
+
+        // Vertical grid lines
+        for (let i = 0; i <= 10; i++) {
+            const x = padding + (i / 10) * chartWidth;
+            ctx.beginPath();
+            ctx.moveTo(x, padding);
+            ctx.lineTo(x, canvas.height - padding);
+            ctx.stroke();
+        }
+
+        // Draw sequence length indicator
+        ctx.fillStyle = '#3498db';
+        ctx.fillRect(padding, padding, chartWidth, 10);
+
+        // Draw pattern centers as points
+        ctx.fillStyle = '#e74c3c';
+        patterns.forEach(pattern => {
+            const x = padding + (pattern.center / sequenceLength) * chartWidth;
+            const y = canvas.height / 2;
+
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw vertical line to sequence
+            ctx.beginPath();
+            ctx.moveTo(x, y + 5);
+            ctx.lineTo(x, padding + 10);
+            ctx.strokeStyle = 'rgba(231, 76, 60, 0.3)';
+            ctx.stroke();
+        });
+
+        // Add labels
+        ctx.fillStyle = '#2c3e50';
+        ctx.font = '12px Arial';
+        ctx.fillText('DNA Sequence (0 - ' + sequenceLength + ' bp)', padding, padding - 10);
+        ctx.fillText('Pattern Centers Distribution', canvas.width / 2 - 100, 30);
+    }
+
+    function drawGrid(ctx, padding, chartWidth, chartHeight, minValue, maxValue, numPoints) {
+        ctx.strokeStyle = '#ddd';
+        ctx.lineWidth = 1;
+
+        // Vertical grid lines
+        for (let i = 0; i <= 10; i++) {
+            const x = padding + (i / 10) * chartWidth;
+            ctx.beginPath();
+            ctx.moveTo(x, padding);
+            ctx.lineTo(x, padding + chartHeight);
+            ctx.stroke();
+
+            // X-axis labels
+            if (numPoints > 0) {
+                const pos = Math.floor((i / 10) * (numPoints - 1));
+                ctx.fillStyle = '#666';
+                ctx.font = '10px Arial';
+                ctx.fillText(pos, x - 5, padding + chartHeight + 15);
+            }
+        }
+
+        // Horizontal grid lines
+        for (let i = 0; i <= 10; i++) {
+            const y = padding + (i / 10) * chartHeight;
+            ctx.beginPath();
+            ctx.moveTo(padding, y);
+            ctx.lineTo(padding + chartWidth, y);
+            ctx.stroke();
+
+            // Y-axis labels
+            const value = minValue + ((10 - i) / 10) * (maxValue - minValue);
+            ctx.fillStyle = '#666';
+            ctx.font = '10px Arial';
+            ctx.fillText(value.toFixed(1), padding - 30, y + 3);
+        }
+
+        // Draw axes
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding, padding);
+        ctx.lineTo(padding, padding + chartHeight);
+        ctx.lineTo(padding + chartWidth, padding + chartHeight);
+        ctx.stroke();
+    }
+
+    function useExampleSequence() {
+        document.getElementById('dnaSequence').value =
+            'CGGACTGATCTATCTAAAAAAAAAAAAAAAAAAAAAAAAAAACGTAGCATCTATCGATCTATCTAGCGATCTATCTACTACG';
+        document.getElementById('windowSize').value = 30;
+        document.getElementById('stepSize').value = 1;
+        analyzeSequence();
+    }
+
+    // Initialize with example sequence
+    window.onload = function() {
+        useExampleSequence();
+    };
+</script>
+</body>
+</html>
