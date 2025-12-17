@@ -1,0 +1,67 @@
+1. Count Matrix:
+   A: [3, 6, 1, 0, 0, 6, 7, 3, 1]
+   C: [2, 2, 1, 0, 0, 2, 1, 1, 2]
+   G: [1, 1, 7, 10, 0, 1, 1, 4, 1]
+   T: [4, 1, 1, 0, 10, 1, 1, 2, 6]
+
+2. Weight Matrix (with pseudocounts):
+   A: [0.129, 0.226, 0.065, 0.032, 0.032, 0.226, 0.258, 0.129, 0.065]
+   C: [0.097, 0.097, 0.065, 0.032, 0.032, 0.097, 0.065, 0.065, 0.097]
+   G: [0.065, 0.065, 0.258, 0.355, 0.032, 0.065, 0.065, 0.161, 0.065]
+   T: [0.161, 0.065, 0.065, 0.032, 0.355, 0.065, 0.065, 0.097, 0.226]
+
+3. Relative Frequencies Matrix:
+   A: [0.129, 0.226, 0.065, 0.032, 0.032, 0.226, 0.258, 0.129, 0.065]
+   C: [0.097, 0.097, 0.065, 0.032, 0.032, 0.097, 0.065, 0.065, 0.097]
+   G: [0.065, 0.065, 0.258, 0.355, 0.032, 0.065, 0.065, 0.161, 0.065]
+   T: [0.161, 0.065, 0.065, 0.032, 0.355, 0.065, 0.065, 0.097, 0.226]
+
+4. Log-Likelihoods Matrix (natural log):
+   A: [-0.661, -0.102, -1.355, -2.048, -2.048, -0.102, 0.032, -0.661, -1.355]
+   C: [-0.949, -0.949, -1.355, -2.048, -2.048, -0.949, -1.355, -1.355, -0.949]
+   G: [-1.355, -1.355, 0.032, 0.350, -2.048, -1.355, -1.355, -0.438, -1.355]
+   T: [-0.438, -1.355, -1.355, -2.048, 0.350, -1.355, -1.355, -0.949, -0.102]
+
+5. Analyzing sequence S:
+   S = 'CAGGTTGGAAACGTAATCAGCGATTACGCATGACGTAA'
+   Length: 38
+
+   Scores for each sliding window (position:score):
+   Position  0: CAGGTTGGA - Score: -4.821
+   Position  1: AGGTTGGAA - Score: -8.407
+   Position  2: GGTTGGAAA - Score: -11.498
+   Position  3: GTTGGAAAC - Score: -7.442
+   Position  4: TTGGAAACG - Score: -6.238
+   Position  5: TGGAAACGT - Score: -7.853
+   Position  6: GGAAACGTA - Score: -12.766
+   Position  7: GAAACGTAA - Score: -11.631
+   Position  8: AAACGTAAT - Score: -8.299
+   Position  9: AACGTAATC - Score: -3.386
+   Position 10: ACGTAATCA - Score: -9.840
+   Position 11: CGTAATCAG - Score: -12.479
+   Position 12: GTAATCAGC - Score: -8.066
+   Position 13: TAATCAGCG - Score: -10.155
+   Position 14: AATCAGCGA - Score: -10.715
+   Position 15: ATCAGCGAT - Score: -10.533
+   Position 16: TCAGCGATT - Score: -6.813
+   Position 17: CAGCGATTA - Score: -8.874
+   Position 18: AGCGATTAC - Score: -9.388
+   Position 19: GCGATTACG - Score: -8.001
+   Position 20: CGATTACGC - Score: -8.199
+   Position 21: GATTACGCA - Score: -11.919
+   Position 22: ATTACGCAT - Score: -10.938
+   Position 23: TTACGCATG - Score: -10.464
+   Position 24: TACGCATGA - Score: -6.841
+   Position 25: ACGCATGAC - Score: -9.994
+   Position 26: CGCATGACG - Score: -9.388
+   Position 27: GCATGACGT - Score: -9.750
+   Position 28: CATGACGTA - Score: -8.710
+   Position 29: ATGACGTAA - Score: -10.805
+
+   High-scoring windows (potential motif matches):
+
+   NO SIGNAL DETECTED: No windows with positive scores found.
+   The sequence S likely does not contain exon-intron borders.
+
+Process finished with exit code 0
+
