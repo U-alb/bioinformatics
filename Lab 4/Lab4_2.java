@@ -84,25 +84,19 @@ public class Lab4_2 {
 
     public static void main(String[] args) {
         try {
-            // Read COVID-19 and Influenza genome sequences
             String covidSequence = readFastaFile("covid19.fasta");
             String influenzaSequence = readFastaFile("influenza-river-sequence.fasta");
 
-            // Analyze and create charts for COVID-19 and Influenza genomes
             createCodonFrequencyChart(covidSequence, "COVID-19 Top 10 Codons");
             createCodonFrequencyChart(influenzaSequence, "Influenza Top 10 Codons");
 
-            // Task c: Compare codons between the two genomes
             compareGenomeCodons(covidSequence, influenzaSequence);
 
-            // Task d: Show top 3 amino acids for each genome
             analyzeAminoAcidFrequencies(covidSequence, "COVID-19");
             analyzeAminoAcidFrequencies(influenzaSequence, "Influenza");
 
-            // Additional analysis
             performDetailedGenomeAnalysis(covidSequence, influenzaSequence);
 
-            // Codon usage bias comparison
             compareCodonUsageBias(covidSequence, influenzaSequence);
 
         } catch (IOException e) {
@@ -110,41 +104,35 @@ public class Lab4_2 {
         }
     }
     private static void createCodonFrequencyChart(String sequence, String chartTitle) {
-        // Transcribe DNA to RNA
         String rnaSequence = sequence.replace('T', 'U');
 
-        // Count codon frequencies
         Map<String, Integer> codonFrequencies = new HashMap<>();
         for (int i = 0; i < rnaSequence.length() - 2; i += 3) {
             String codon = rnaSequence.substring(i, i + 3);
             codonFrequencies.put(codon, codonFrequencies.getOrDefault(codon, 0) + 1);
         }
 
-        // Get top 10 most frequent codons
         List<Map.Entry<String, Integer>> topCodons = codonFrequencies.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
                 .limit(10)
                 .toList();
 
-        // Create dataset for the chart
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
         for (Map.Entry<String, Integer> entry : topCodons) {
             dataset.addValue(entry.getValue(), "Frequency", entry.getKey());
         }
 
-        // Create the chart
         JFreeChart chart = ChartFactory.createBarChart(
-                chartTitle,       // Chart title
-                "Codons",         // X-Axis Label
-                "Frequency",      // Y-Axis Label
-                dataset,          // Dataset
-                PlotOrientation.VERTICAL, // Plot Orientation
-                false,            // Show Legend
-                true,             // Use tooltips
-                false             // Configure chart to generate URLs?
+                chartTitle,
+                "Codons",
+                "Frequency",
+                dataset,
+                PlotOrientation.VERTICAL,
+                false,
+                true,
+                false
         );
 
-        // Create and display the chart
         ChartPanel chartPanel = new ChartPanel(chart);
         JFrame frame = new JFrame(chartTitle);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -155,19 +143,15 @@ public class Lab4_2 {
     }
 
     private static String readFastaFile(String filename) throws IOException {
-        // Print out the full path for debugging
         System.out.println("Attempting to read file: " + filename);
 
-        // Get the input stream and print diagnostic information
         InputStream inputStream = Lab4_2.class.getClassLoader().getResourceAsStream(filename);
 
         if (inputStream == null) {
-            // Detailed error logging
             System.err.println("File not found in resources: " + filename);
             System.err.println("Current working directory: " + System.getProperty("user.dir"));
             System.err.println("Classpath: " + System.getProperty("java.class.path"));
 
-            // List all resources in the classpath
             try {
                 URL[] urls = ((URLClassLoader)Lab4_2.class.getClassLoader()).getURLs();
                 for (URL url : urls) {
@@ -197,8 +181,6 @@ public class Lab4_2 {
         return sequence.toString();
     }
 
-
-    // Optional: Method to print top 10 codons to console
     private static void printTopCodons(Map<String, Integer> codonFrequencies, String genomeName) {
         System.out.println("\nTop 10 Most Frequent Codons for " + genomeName + ":");
         codonFrequencies.entrySet().stream()
@@ -207,17 +189,13 @@ public class Lab4_2 {
                 .forEach(entry -> System.out.println(entry.getKey() + ": " + entry.getValue()));
     }
 
-    // Additional method to compare codons between genomes
     private static void compareGenomeCodons(String covidSequence, String influenzaSequence) {
-        // Transcribe both sequences to RNA
         String covidRnaSequence = covidSequence.replace('T', 'U');
         String influenzaRnaSequence = influenzaSequence.replace('T', 'U');
 
-        // Count codon frequencies for both genomes
         Map<String, Integer> covidCodonFrequencies = getCodonFrequencies(covidRnaSequence);
         Map<String, Integer> influenzaCodonFrequencies = getCodonFrequencies(influenzaRnaSequence);
 
-        // Create a comparison chart
         createComparativeCodonChart(covidCodonFrequencies, influenzaCodonFrequencies);
     }
 
@@ -225,7 +203,6 @@ public class Lab4_2 {
             Map<String, Integer> covidCodonFrequencies,
             Map<String, Integer> influenzaCodonFrequencies) {
 
-        // Combine and get top 10 unique codons across both genomes
         Set<String> topCodons = Stream.concat(
                         covidCodonFrequencies.entrySet().stream(),
                         influenzaCodonFrequencies.entrySet().stream())
@@ -234,7 +211,6 @@ public class Lab4_2 {
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
 
-        // Create dataset for the comparative chart
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
         for (String codon : topCodons) {
             int covidFreq = covidCodonFrequencies.getOrDefault(codon, 0);
@@ -244,19 +220,17 @@ public class Lab4_2 {
             dataset.addValue(influenzaFreq, "Influenza", codon);
         }
 
-        // Create the comparative chart
         JFreeChart chart = ChartFactory.createBarChart(
-                "Comparative Codon Frequencies",  // Chart title
-                "Codons",                         // X-Axis Label
-                "Frequency",                      // Y-Axis Label
-                dataset,                          // Dataset
-                PlotOrientation.VERTICAL,         // Plot Orientation
-                true,                             // Show Legend
-                true,                             // Use tooltips
-                false                             // Configure chart to generate URLs?
+                "Comparative Codon Frequencies",
+                "Codons",
+                "Frequency",
+                dataset,
+                PlotOrientation.VERTICAL,
+                true,
+                true,
+                false
         );
 
-        // Create and display the chart
         ChartPanel chartPanel = new ChartPanel(chart);
         JFrame frame = new JFrame("Comparative Codon Frequencies");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -275,12 +249,9 @@ public class Lab4_2 {
         return codonFrequencies;
     }
 
-    // Method to analyze amino acid frequencies
     private static void analyzeAminoAcidFrequencies(String sequence, String genomeName) {
-        // Transcribe DNA to RNA
         String rnaSequence = sequence.replace('T', 'U');
 
-        // Translate to amino acids and count frequencies
         Map<String, Integer> aminoAcidFrequencies = new HashMap<>();
         for (int i = 0; i < rnaSequence.length() - 2; i += 3) {
             String codon = rnaSequence.substring(i, i + 3);
@@ -291,7 +262,6 @@ public class Lab4_2 {
             }
         }
 
-        // Create amino acid frequency chart
         createAminoAcidFrequencyChart(aminoAcidFrequencies, genomeName);
     }
 
@@ -299,31 +269,27 @@ public class Lab4_2 {
             Map<String, Integer> aminoAcidFrequencies,
             String genomeName) {
 
-        // Get top 3 amino acids
         List<Map.Entry<String, Integer>> topAminoAcids = aminoAcidFrequencies.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
                 .limit(3)
                 .toList();
 
-        // Create dataset for the chart
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
         for (Map.Entry<String, Integer> entry : topAminoAcids) {
             dataset.addValue(entry.getValue(), "Frequency", entry.getKey());
         }
 
-        // Create the chart
         JFreeChart chart = ChartFactory.createBarChart(
-                genomeName + " - Top 3 Amino Acids",  // Chart title
-                "Amino Acids",                        // X-Axis Label
-                "Frequency",                          // Y-Axis Label
-                dataset,                              // Dataset
-                PlotOrientation.VERTICAL,             // Plot Orientation
-                false,                                // Show Legend
-                true,                                 // Use tooltips
-                false                                 // Configure chart to generate URLs?
+                genomeName + " - Top 3 Amino Acids",
+                "Amino Acids",
+                "Frequency",
+                dataset,
+                PlotOrientation.VERTICAL,
+                false,
+                true,
+                false
         );
 
-        // Create and display the chart
         ChartPanel chartPanel = new ChartPanel(chart);
         JFrame frame = new JFrame(genomeName + " Amino Acid Frequencies");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -333,12 +299,10 @@ public class Lab4_2 {
         frame.setVisible(true);
     }
 
-    // Detailed genome analysis method
     private static void performDetailedGenomeAnalysis(
             String covidSequence,
             String influenzaSequence) {
 
-        // Analyze codon frequencies
         Map<String, Integer> covidCodonFreq = getCodonFrequencies(
                 covidSequence.replace('T', 'U')
         );
@@ -346,26 +310,21 @@ public class Lab4_2 {
                 influenzaSequence.replace('T', 'U')
         );
 
-        // Print top codons to console
         System.out.println("COVID-19 Top Codons:");
         printTopCodons(covidCodonFreq, "COVID-19");
 
         System.out.println("\nInfluenza Top Codons:");
         printTopCodons(influenzaCodonFreq, "Influenza");
 
-        // Create visualizations
         createCodonFrequencyChart(covidSequence, "COVID-19 Top 10 Codons");
         createCodonFrequencyChart(influenzaSequence, "Influenza Top 10 Codons");
 
-        // Create comparative codon chart
         createComparativeCodonChart(covidCodonFreq, influenzaCodonFreq);
 
-        // Analyze and visualize amino acid frequencies
         analyzeAminoAcidFrequencies(covidSequence, "COVID-19");
         analyzeAminoAcidFrequencies(influenzaSequence, "Influenza");
     }
 
-    // Additional utility methods for advanced analysis
     private static Map<String, Double> calculateCodonUsageBias(String sequence) {
         String rnaSequence = sequence.replace('T', 'U');
         Map<String, Integer> codonFrequencies = getCodonFrequencies(rnaSequence);
@@ -382,14 +341,11 @@ public class Lab4_2 {
         Map<String, Double> covidCodonBias = calculateCodonUsageBias(covidSequence);
         Map<String, Double> influenzaCodonBias = calculateCodonUsageBias(influenzaSequence);
 
-        // Create a dataset for comparing codon usage bias
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
 
-        // Combine unique codons from both sequences
         Set<String> uniqueCodons = new HashSet<>(covidCodonBias.keySet());
         uniqueCodons.addAll(influenzaCodonBias.keySet());
 
-        // Add data to dataset
         for (String codon : uniqueCodons) {
             dataset.addValue(
                     covidCodonBias.getOrDefault(codon, 0.0),
@@ -403,19 +359,17 @@ public class Lab4_2 {
             );
         }
 
-        // Create and display the chart
         JFreeChart chart = ChartFactory.createBarChart(
-                "Codon Usage Bias Comparison",  // Chart title
-                "Codons",                       // X-Axis Label
-                "Usage Frequency",              // Y-Axis Label
-                dataset,                        // Dataset
-                PlotOrientation.VERTICAL,       // Plot Orientation
-                true,                           // Show Legend
-                true,                           // Use tooltips
-                false                           // Configure chart to generate URLs?
+                "Codon Usage Bias Comparison",
+                "Codons",
+                "Usage Frequency",
+                dataset,
+                PlotOrientation.VERTICAL,
+                true,
+                true,
+                false
         );
 
-        // Display chart
         ChartPanel chartPanel = new ChartPanel(chart);
         JFrame frame = new JFrame("Codon Usage Bias Comparison");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);

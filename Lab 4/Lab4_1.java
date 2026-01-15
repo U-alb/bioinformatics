@@ -85,27 +85,25 @@ public class Lab4_1 {
     }
 
     private static String transcribeToRNA(String dna) {
-        return dna.replace('T', 'U'); // Replace Thymine (T) with Uracil (U)
+        return dna.replace('T', 'U');
     }
 
     private static String translateToAminoAcids(String rna) {
         StringBuilder aminoAcidSequence = new StringBuilder();
 
-        // Process the RNA sequence in chunks of three (codons)
         for (int i = 0; i < rna.length(); i += 3) {
-            if (i + 2 < rna.length()) { // Ensure there are enough bases for a codon
+            if (i + 2 < rna.length()) {
                 String codon = rna.substring(i, i + 3);
                 String aminoAcid = geneticCode.get(codon);
                 if (aminoAcid != null) {
                     if (aminoAcid.equals("Stop")) {
-                        break; // Stop translation at 'Stop' codon
+                        break;
                     }
                     aminoAcidSequence.append(aminoAcid).append("-");
                 }
             }
         }
 
-        // Remove the last "-" if present
         if (!aminoAcidSequence.isEmpty()) {
             aminoAcidSequence.setLength(aminoAcidSequence.length() - 1);
         }
@@ -113,4 +111,3 @@ public class Lab4_1 {
         return aminoAcidSequence.toString();
     }
 }
-
